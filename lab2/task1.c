@@ -13,14 +13,26 @@ typedef enum key_errors
     FINE,
     MEMORY_ALLOCATION_ERROR
 }ERRORS;
+
+typedef enum  enum_number
+{
+    OVERFLOW,
+    NOT_A_NUMBER,
+    NEGATIVE_DIGIT,
+    OK
+}Number_Errors;
+
 int get_len(char* str);
 char* reverse(char* str);
 char* up_honest(char* str);
 char* sort(char* str);
-char* concatenate(char* str[], int pos,...);
-char* get_concatenated(char* str1, char* str2);
+char* concatenate(int n_seed, int n, char** str);
+void get_concatenated(char** str1, char* str2, int len_str1, int* pos);
 int validation_of_key(char* str);
 int compare(void const* elem1, void const* elem2);
+void removeLeadingZeros(char* str);
+int string_compare(char* str1, char* str2);
+int number_check(char* str);
 
 int main(int argc, char* argv[])
 {
@@ -48,6 +60,10 @@ int main(int argc, char* argv[])
     char* reversed;
     char* upped_honest;
     char* sorted;
+    char* concatenate_strings;
+    char* for_swap;
+    int number_for_seed;
+    int check_numbers;
     switch (argv[1][1])
     {
         case 'l':
@@ -87,6 +103,28 @@ int main(int argc, char* argv[])
             printf("NEW SORTED STRING\n%s", sorted);
             free(sorted);
             return 0;
+        case 'c':
+            check_numbers = number_check(argv[3]);
+            if(check_numbers != OK)
+            {
+                printf("INVALID INPUT OF SEED\n");
+                return check_numbers;
+            }
+            number_for_seed = atoi(argv[3]);
+            for_swap = argv[3];
+            argv[3] = argv[2];
+            argv[2] = argv[3];
+
+            concatenate_strings = concatenate(number_for_seed, argc - 3,argv + 3);
+            if(concatenate_strings == NULL)
+            {
+                printf("MEMORY ALLOCATION ERROR\n");
+                free(concatenate_strings);
+                return MEMORY_ALLOCATION_ERROR;
+            }
+            printf("CONCATENATED STRINGS FROM COMMAND LINE IN PSEUDO - RANDOM SEQUENCE:\n%s\n", concatenate_strings);
+            free(concatenate_strings);
+            return 0;
     }
 }
 int validation_of_key(char* str)
@@ -96,6 +134,79 @@ int validation_of_key(char* str)
     if(str[1] !='r' && str[1] != 'l' && str[1] != 'u' && str[1] != 'n' && str[1] != 'c') return WRONG_FLAG;
     return FINE;
 }
+
+int number_check(char* str)
+{
+    int len_str = get_len(str);
+    char max_value[] = "42949667294";
+    if(str[0] == '-') return NEGATIVE_DIGIT;
+    if(str[0]>='0' && str[0] <='9')
+    {
+        for(int i = 1; i<len_str;++i)
+        {
+            if(str[i] >= '0' && str[i] <='9') continue;
+            else return NOT_A_NUMBER;
+        }
+
+        if(str[0] == '-')
+        {
+            removeLeadingZeros(str);
+            int compare = string_compare(str, max_value);
+            switch(compare)
+            {
+                case 1:
+                    return OK;
+                default:
+                    return OVERFLOW;
+            }
+        }
+        else
+        {
+            removeLeadingZeros(str);
+            int compare = string_compare(str, max_value);
+            switch(compare)
+            {
+                case 1:
+                    return OK;
+                case 0:
+                    return OK;
+                default:
+                    return OVERFLOW;
+            }
+        }
+    }
+    else return NOT_A_NUMBER;
+}
+
+int string_compare(char* str1, char* str2)
+{
+    int n1 = get_len(str1);
+    int n2 = get_len(str2);
+    if(n1 < n2) return 1;
+    if(n1 > n2) return -1;
+    else
+    {
+        for(int i = 0; i<n1; ++i)
+        {
+            if(str1[i] > str2[i]) return -1;
+            else if(str1[i] < str2[i]) return 1;
+        }
+        return 0;
+    }
+}
+
+void removeLeadingZeros(char* str)
+{
+    int i = 0,j = 0;
+    while (str[i] == '0') {
+        i++;
+    }
+    while (str[i] != '\0') {
+        str[j++] = str[i++];
+    }
+    str[j] = '\0';
+}
+
 int get_len(char* str)
 {
     int len = 0;
@@ -150,28 +261,32 @@ char* sort (char* str)
     return new;
 }
 
-char* get_concatenated(char* str1, char* str2)
+void get_concatenated(char** str1, char* str2, int len1, int* pos)
 {
-    int len1 = get_len(str1);
     int len2 = get_len(str2);
-    char* concatenated = (char*)malloc(sizeof(char) * (len1 + len2));
-    if(concatenated == NULL) return NULL;
-    for(int i = 0; i < len1 + len2; ++i)
+    for(int i = 0; i < len2; ++i)
     {
-        if(i<len1) concatenated[i] = str1[i];
-        else concatenated[i] = str2[i - len1];
+        (*str1)[i + *pos] = str2[i];
     }
-    return concatenated;
+    *pos += len2;
 }
 
-char* concatenate(char* str[], int pos,...)
+char* concatenate(int n_seed, int n, char** str)
 {
-    va_list strings;
-    char* con = (char*)malloc(sizeof(char));
-    if(con == NULL) return NULL;
-    va_arg(strings, &(str[pos]));
-    while(strings != NULL)
+    srand(n_seed);
+    int len_of_all_str = 0;
+    for(int i = 0; i < n; ++i)
+        len_of_all_str += get_len(str[i]);
+    char* concatenated = (char*)malloc(sizeof(char) * len_of_all_str);
+    if(concatenated == NULL) return NULL;
+    int pos = 0;
+    concatenated[len_of_all_str] = '\0';
+    while(n > 0)
     {
-
+        int index = rand() % n;
+        get_concatenated(&concatenated, str[index], len_of_all_str, &pos);
+        str[index] = str[n-1];
+        n--;
     }
+    return concatenated;
 }
