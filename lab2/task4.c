@@ -7,9 +7,9 @@
 #define DEGREE 1
 enum exit_codes
 {
-    memory_error,
-    convex,
-    concave,
+    MEMORY_ALLOCATION_ERROR,
+    CONVEX,
+    CONCAVE,
 };
 
 typedef struct point_2d
@@ -30,12 +30,12 @@ double polynomial(double value, int degree, ...);
 
 int main() {
     int _convex = is_convex(VERTEX_AMOUNT, (point_2d){0.8, 0.8}, (point_2d){0,1}, (point_2d){1,1}, (point_2d){1,0});
-    if(_convex == memory_error)
+    if(_convex == MEMORY_ALLOCATION_ERROR)
     {
         printf("memory_error\n");
         return 1;
     }
-    printf("%s\n", _convex == convex ? "convex" : "concave" );
+    printf("%s\n", _convex == CONVEX ? "convex" : "concave" );
 
 
     double poly = polynomial(VALUE, DEGREE, VALUE);
@@ -64,7 +64,7 @@ int is_convex(int vertex_amount, ...)
     point_2d* polygon = (point_2d*)malloc(sizeof(point_2d)*vertex_amount);
     if(polygon == NULL)
     {
-        return memory_error;
+        return MEMORY_ALLOCATION_ERROR;
     }
 
     for(int i = 0; i < vertex_amount; i++)
@@ -93,12 +93,12 @@ int is_convex(int vertex_amount, ...)
         else if (z > 0)
             flag |= 2;
         if (flag == 3)
-            return(convex);
+            return(CONVEX);
     }
     if (flag != 0)
-        return(concave);
+        return(CONCAVE);
     else
-        return(convex);
+        return(CONVEX);
 }
 
 double polynomial(double value, int degree, ...)

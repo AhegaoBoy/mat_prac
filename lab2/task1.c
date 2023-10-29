@@ -23,13 +23,13 @@ typedef enum  enum_number
 }Number_Errors;
 
 int get_len(char* str);
-char* reverse(char* str);
+void reverse(char* str, char** result);
 char* up_honest(char* str);
 char* sort(char* str);
 char* concatenate(int n_seed, int n, char** str);
 void get_concatenated(char** str1, char* str2, int len_str1, int* pos);
 int validation_of_key(char* str);
-int compare(void const* elem1, void const* elem2);
+int compare(char* c1, char* c2);
 void removeLeadingZeros(char* str);
 int string_compare(char* str1, char* str2);
 int number_check(char* str);
@@ -68,10 +68,10 @@ int main(int argc, char* argv[])
     {
         case 'l':
             length = get_len(argv[2]);
-            printf("LENGTH OF STRING %s  - %d\n", argv[2], length);
+            printf("LENGTH OF STRING %s  IS %d\n", argv[2], length);
             return 0;
         case 'r':
-            reversed = reverse(argv[2]);
+            reverse(argv[2], &reversed);
             if(reversed == NULL)
             {
                 free(reversed);
@@ -104,18 +104,18 @@ int main(int argc, char* argv[])
             free(sorted);
             return 0;
         case 'c':
-            check_numbers = number_check(argv[3]);
+            check_numbers = number_check(argv[4]);
             if(check_numbers != OK)
             {
                 printf("INVALID INPUT OF SEED\n");
                 return check_numbers;
             }
-            number_for_seed = atoi(argv[3]);
+            number_for_seed = atoi(argv[4]);
             for_swap = argv[3];
-            argv[3] = argv[2];
-            argv[2] = argv[3];
+            argv[3] = argv[4];
+            argv[4] = for_swap;
 
-            concatenate_strings = concatenate(number_for_seed, argc - 3,argv + 3);
+            concatenate_strings = concatenate(number_for_seed, argc - 4,argv + 4);
             if(concatenate_strings == NULL)
             {
                 printf("MEMORY ALLOCATION ERROR\n");
@@ -213,14 +213,15 @@ int get_len(char* str)
     while(str[len] != '\0') len++;
     return len;
 }
-char* reverse(char* str)
+void reverse(char* string, char** result)
 {
-    int len = get_len(str);
-    char* new = (char*)malloc(sizeof(char) * len);
-    if(new == NULL) return NULL;
-    for(int i = 0; i <= len/2; ++i)
-        new[i] = str[len - i];
-    return new;
+    int count = get_len(string);
+    *result = (char*)malloc(sizeof(char)*(count+1));
+    if(*result == NULL)
+        return;
+    for(int i = 0; i < count; i++)
+        (*result)[i] = string[count-i-1];
+    (*result)[count] = '\0';
 }
 char* up_honest(char* str)
 {
@@ -235,29 +236,66 @@ char* up_honest(char* str)
     return new;
 }
 
-int compare(void const* elem1, void const* elem2)
-{
-    char const c1 = *( (char const*) elem1);
-    char const c2 = *( (char const*) elem2);
-    if(isalnum(c1) && isalnum(c2))
-    {
-        if(isdigit(c1) && isalpha(c2)) return 1;
-        if(isdigit(c2) && isalpha(c1)) return -1;
-        if(isdigit(c2) && isdigit(c1) || isalpha(c2) && isalpha(c1)) return 0;
-    }
-    else
-    {
-        return 0;
-    }
-}
 
 char* sort (char* str)
 {
     int len = get_len(str);
+    char* for_digits = (char*)malloc(sizeof(char));
+    int capacity1 = 1, pos1 = 0;
+    char* for_alphas = (char*)malloc(sizeof(char));
+    int capacity2 = 1, pos2 = 0;
+    char* for_other = (char*)malloc(sizeof(char));
+    int capacity3 = 1, pos3 = 0;
     char* new = (char*)malloc(sizeof(char) * len);
-    if(new == NULL) NULL;
-    for(int i = 0; i<len; ++i) new[i] = str[i];
-    qsort(new, sizeof(char), len, compare);
+    if(new == NULL || for_other == NULL || for_alphas == NULL || for_digits == NULL) NULL;
+    for(int i = 0; i<len; ++i)
+    {
+        if(isdigit(str[i]))
+        {
+            if(get_len(for_digits) == capacity1)
+            {
+                char* for_realloc = (char*)realloc(for_digits, 2*capacity1);
+                capacity1 <<= 1;
+                if(for_realloc == NULL) return NULL;
+                for_digits = for_realloc;
+            }
+            for_digits[pos1++] = str[i];
+        }
+        else if(isalpha(str[i]))
+        {
+            if(get_len(for_alphas) == capacity2)
+            {
+                char* for_realloc = (char*)realloc(for_alphas, 2*capacity2);
+                capacity2 <<= 1;
+                if(for_realloc == NULL) return NULL;
+                for_alphas = for_realloc;
+            }
+            for_alphas[pos2++] = str[i];
+        }
+        else
+        {
+            if(get_len(for_other) == capacity3)
+            {
+                char* for_realloc = (char*)realloc(for_other, 2*capacity1);
+                capacity3 <<= 1;
+                if(for_realloc == NULL) return NULL;
+                for_other = for_realloc;
+            }
+            for_other[pos3++] = str[i];
+        }
+    }
+    for_digits[pos1 + 1] = '\0';
+    for_alphas[pos2 + 1] = '\0';
+    for_other[pos3 + 1] = '\0';
+    int len1 = get_len(for_digits);
+    int len2 = get_len(for_alphas);
+    int len3 = get_len(for_other);
+    for(int i = 0; i < len1; ++i) new[i] = for_digits[i];
+    for(int i = 0; i < len2; ++i) new[i + len1] = for_alphas[i];
+    for(int i = 0; i < len3; ++i) new[i + len1 + len2] = for_other[i];
+    free(for_digits);
+    free(for_alphas);
+    free(for_other);
     return new;
 }
 
