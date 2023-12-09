@@ -60,7 +60,13 @@ int main(int argc, char* argv[])
 
     if(statusCode != FINE)
     {
-        printf("SOME PROBLEMS, STATUS CODE: %d", statusCode);
+        switch (statusCode) {
+            case MEMORY_ALLOCATION_ERROR:
+                printf("MEMORY ALLOCATION ERROR\n");
+            case WRONG_FIELD_OF_STRUCTURE:
+                printf("CHECK IF ALL FIELDS ARE CORRECT\n");
+        }
+        fclose(input);
         return statusCode;
     }
     fclose(input);
@@ -92,7 +98,6 @@ void skip_dividers(int* c, FILE* f)
         if(*c == EOF || isalnum(*c)) break;
         *c = fgetc(f);
     }while(*c == ' ' || *c== '\t' || *c=='\n');
-    //fseek(f, -1, SEEK_CUR);
 }
 
 void free_fields_of_struct(const void* to_clear, ...)
@@ -309,7 +314,7 @@ status_code read_field_fom_file(struct Employee* employee, FILE* input)
                 if(check != FINE)
                 {
                     free(str);
-                    return MEMORY_ALLOCATION_ERROR;
+                    return check;
                 }
                 employee->name =  (char*)malloc(sizeof(char) * len);
                 if(employee->name == NULL)
@@ -325,7 +330,7 @@ status_code read_field_fom_file(struct Employee* employee, FILE* input)
                 {
                     free(str);
                     free(employee->name);
-                    return MEMORY_ALLOCATION_ERROR;
+                    return check;
                 }
                 employee->surname =  (char*)malloc(sizeof(char) * len);
                 if(employee->surname == NULL)
@@ -343,7 +348,7 @@ status_code read_field_fom_file(struct Employee* employee, FILE* input)
                 {
                     free(str);
                     free_fields_of_struct(employee->name, employee->surname, NULL);
-                    return MEMORY_ALLOCATION_ERROR;
+                    return check;
                 }
                 employee->salary = strtod(str, &for_strtod);
                 break;

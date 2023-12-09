@@ -47,9 +47,10 @@ int main()
 
 status_code convert_to_base(char** result, unsigned int n, int pow)
 {
-    int length_of_result = sizeof(unsigned int) / pow + 2;
+    int length_of_result = sizeof(unsigned int) * 8 / pow + 2;
     (*result) = (char*)malloc(sizeof(char) * length_of_result);
     if(result == NULL) return MEMORY_ALLOCATION_ERROR;
+    (*result)[length_of_result] = '\0';
     int rang_of_group = 1<<pow;
     for(int i = length_of_result - 1; i >=0; i--)
     {
@@ -57,7 +58,7 @@ status_code convert_to_base(char** result, unsigned int n, int pow)
         for(int j = 2; j < rang_of_group; j<<=1)
             group |= n & j;
         if(group < 10) (*result)[i] = group + '0';
-        else (*result)[i] = group - 10 + 'A';
+        else (*result)[i] = group - 10 + 'a';
         n >>= pow;
     }
     return FINE;
