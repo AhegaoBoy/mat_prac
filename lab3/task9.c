@@ -8,6 +8,7 @@ typedef enum errors
     MEMORY_ALLOCATION_ERROR = 1,
     WRONG_QUANTITY_OF_ARGUMENTS,
     FILE_OPEN_ERROR,
+    WRONG_SEPARATOR,
     EMPTY_SEPARATOR,
     WORD_NOT_FOUND,
     EMPTY_STRUCTURE,
@@ -100,6 +101,9 @@ int main(int argc, char* argv[])
             case MEMORY_ALLOCATION_ERROR:
                 printf("MEMORY ALLOCATION ERROR\n");
                 return MEMORY_ALLOCATION_ERROR;
+            case WRONG_SEPARATOR:
+                printf("YOU'VE INPUT WRONG SEPARATOR\n");
+                return WRONG_SEPARATOR;
         }
     }
     quantity_of_separators = strlen(separators);
@@ -305,15 +309,7 @@ status_code array_of_separators(int argc, char** argv, char** separators)
         if(len == 2)
         {
             if(argv[i][0] == argv[i][1] && argv[i][1] == '\'')
-            {
-                (*separators) = strdup("");
-                if(*separators == NULL)
-                {
-                    free(separators);
-                    return MEMORY_ALLOCATION_ERROR;
-                }
-                break;
-            }
+                return EMPTY_SEPARATOR;
         }
         if(len == 1 && i < argc - 1)
         {
@@ -329,10 +325,7 @@ status_code array_of_separators(int argc, char** argv, char** separators)
             }
         }
         else if(len > 4 || len < 3 || argv[i][0] != '\'' || argv[i][len-1] != '\'')
-        {
-            free(separators);
-            return EMPTY_SEPARATOR;
-        }
+            return WRONG_SEPARATOR;
         if(argv[i][1] == '\\')
         {
             switch(argv[i][2])
