@@ -494,7 +494,6 @@ int main(int argc, char * argv[]) {
     return 0;
 }
 
-
 void printPolynomial(Polynomial * head, int first_flag) {
     if (!head) {
         if (first_flag) {

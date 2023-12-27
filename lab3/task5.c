@@ -1,337 +1,742 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
+#include <string.h>
 
-typedef struct {
-    int id;
-    char name[BUFSIZ];
-    char surname[BUFSIZ];
-    char group[BUFSIZ];
-    unsigned char * marks;
-} Student;
+enum exit_codes
+{
+    lesser = -1,
+    equal = 0,
+    bigger = 1,
+    memory_error,
+    success,
+    invalid_file_content,
+    unexpected,
+    eof_reached,
+    endl_reached,
+    newline_reached,
+    space_reached,
+    input_invalid,
+};
 
-typedef enum {
-    OK,
-    NO_MEMORY,
-    INVALID_PARAMETER
-} status_codes;
+struct String
+{
+    char* string;
+    int length;
+};
 
-int name_validation(const char * name) {
-    const size_t size = strlen(name);
-    for (int i = 0; i < strlen(name); i++) {
-        if (!isalpha(name[i])) return 0;
+struct String* create_String(const char* string);
+int clear_string(struct String* s);
+int compare_strings(struct String* s1, struct String* s2);
+int are_equal(struct String* s1, struct String* s2);
+int copy(struct String* from, struct String** to);
+struct String* copy_to_new(struct String* string);
+int concat_strings(struct String* to, struct String* from);
+void delete_string(struct String* string);
+
+
+struct Student
+{
+    unsigned int id;
+    struct String first_name;
+    struct String last_name;
+    struct String group;
+    unsigned char* marks;
+};
+
+enum command_codes
+{
+    print,
+    trace,
+    sort,
+    find,
+    higraders,
+    quit,
+    unknown
+};
+
+int is_correct_word(char* string);
+int is_number(const char* string);
+int get_string(FILE* stream, char** string, int* length);
+
+int write_to_file(const struct Student* student, FILE* dest);
+int read_from_file(FILE* source, struct Student** students, size_t* size);
+
+int sort_students(struct Student** students, size_t amount, const char* field);
+int compare_id(const void* number1, const void* number2);
+int compare_group(const void* str1, const void* str2);
+int compare_firstname(const void* str1, const void* str2);
+int compare_lastname(const void* str1, const void* str2);
+
+int search_for_student(struct Student** students, int students_amount, const char* field, const char* tofind, int* amount, struct Student** results);
+int find_id(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount);
+int find_lastname(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount);
+int find_firstname(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount);
+int find_group(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount);
+
+double get_avg_all(struct Student** students, int amount);
+double get_avg_one(struct Student*);
+
+int dialogue(const char* input_path, int argc, const char** argv);
+
+
+int main(int argc, char** argv) {
+    if(argc < 2 || argc > 3)
+    {
+        printf("wrong amount of arguments given.\n");
+        return 0;
     }
-    return 1;
-}
-
-int int_validation(const char * number) {
-    const size_t size = strlen(number);
-    if (!size) return 0;
-    for (size_t i = 0; i < size; i++) {
-        if (!isdigit(number[i]) || (i != 0 && number[i] == '-')) return 0;
-    }
-    return 1;
-}
-
-int id_comp(const void * first, const void * second);
-
-int surname_comp(const void * first, const void * second);
-
-int name_comp(const void * first, const void * second);
-
-int group_comp(const void * first, const void * second);
-
-void id_finder(Student * database, size_t size, int to_find, int * result, int sort_flag);
-
-status_codes other_finder(Student * database, size_t size, char * to_find, int ** result, size_t * result_size, int find_flag);
-
-status_codes get_database(FILE * file, Student ** database, size_t * size, size_t * capacity, double * summ, double * quantity);
-
-void print_menu();
-
-status_codes communicate(FILE * file, Student * database, size_t size, double ovr_avg);
-
-int main(int argc, char * argv[]) {
-    if (argc != 3) {
-        printf("Wrong flag\n");
-        return -1;
-    }
-    FILE * in = fopen(argv[1], "r");
-    if (!in) {
-        printf("No file\n");
-        return -1;
-    }
-    FILE * out = fopen(argv[2], "w");
-    if (!out) {
-        printf("No file\n");
-        fclose(in);
-        return -1;
-    }
-    Student * database = NULL;
-    size_t size, capacity;
-    double ovr_summ = 0;
-    double ovr_quantity = 0;
-    switch (get_database(in, &database, &size, &capacity, &ovr_summ, &ovr_quantity)) {
-        case OK:
-            break;
-        case NO_MEMORY:
-            fclose(in);
-            fclose(out);
-            printf("No memory\n");
-            return -1;
-        case INVALID_PARAMETER:
-            fclose(in);
-            fclose(out);
-            free(database);
-            printf("Invalid parameter detected\n");
-            return -1;
-
-    }
-    double ovr_avg = ovr_summ / ovr_quantity;
-    if (communicate(out, database, size, ovr_avg) == NO_MEMORY) {
-        free(database);
-        fclose(in);
-        printf("No memory\n");
-        return -1;
-    }
-    free(database);
-    fclose(in);
-    fclose(out);
+    dialogue(argv[1], argc, argv);
     return 0;
 }
 
-status_codes communicate(FILE * file, Student * database, size_t size, double ovr_avg) {
-    print_menu();
-    int sort_flag = 0;
-    while (1) {
-        char command[BUFSIZ];
-        scanf("%s", command);
-        if (strcmp(command, "find") == 0) {
-            char flag[BUFSIZ];
-            scanf("%s", flag);
-            if (strcmp(flag, "id") == 0) {
-                int to_find;
-                int result_id = -1;
-                scanf("%d", &to_find);
-                id_finder(database, size, to_find, &result_id, sort_flag);
-                if (result_id != -1) {
-                    fprintf(file, "%d %s %s %s ", database[result_id].id, database[result_id].name, database[result_id].surname, database[result_id].group);
-                    for (int i = 0; i < 5; i++) fprintf(file, "%c", database[result_id].marks[i]);
-                    fprintf(file, "\n");
-                }
-                fprintf(file, "\n");
-            }
-            else if (strcmp(flag, "surname") == 0 || strcmp(flag, "name") == 0 || strcmp(flag, "group") == 0) {
-                char to_find[BUFSIZ];
-                scanf("%s", to_find);
-                int * result = NULL;
-                size_t result_size = 0;
-                if (other_finder(database, size, to_find, &result, &result_size, (strcmp(flag, "surname") == 0) ? 0 : (strcmp(flag, "name") == 0) ? 1 : 2) == NO_MEMORY) {
-                    fclose(file);
-                    return NO_MEMORY;
-                }
-                for (int i = 0; i < result_size; i++) {
-                    fprintf(file, "%d %s %s %s ", database[result[i]].id, database[result[i]].name, database[result[i]].surname, database[result[i]].group);
-                    for (int j = 0; j < 5; j++) fprintf(file, "%c", database[result[i]].marks[j]);
-                    fprintf(file, "\n");
-                }
-                fprintf(file, "\n");
-                free(result);
-                result = NULL;
-            }
-
-        }
-        else if (strcmp(command, "sort") == 0) {
-            char flag[BUFSIZ];
-            scanf("%s", flag);
-            if (strcmp(flag, "id") == 0) {
-                qsort(database, size, sizeof(database[0]), id_comp);
-                sort_flag = 1;
-            }
-            else {
-                if (strcmp(flag, "surname") == 0) {
-                    qsort(database, size, sizeof(database[0]), surname_comp);
-                }
-                else if (strcmp(flag, "name") == 0) {
-                    qsort(database, size, sizeof(database[0]), name_comp);
-                }
-                else if (strcmp(flag, "grop") == 0) {
-                    qsort(database, size, sizeof(database[0]), group_comp);
-                }
-                sort_flag = 0;
-            }
-        }
-        else if (strcmp(command, "get_stat") == 0) {
-            int to_find;
-            int result_id = -1;
-            scanf("%d", &to_find);
-            id_finder(database, size, to_find, &result_id, sort_flag);
-            if (result_id != -1) {
-                fprintf(file, "%d %s %s %s ", database[result_id].id, database[result_id].name, database[result_id].surname, database[result_id].group);
-                double summ = 0;
-                double quantity = 0;
-                for (int i = 0; i < 5; i++) {
-                    summ += database[result_id].marks[i] - '0';
-                    quantity++;
-                }
-                fprintf(file, "%f\n\n", summ / quantity);
-            }
-        }
-        else if (strcmp(command, "find_best") == 0) {
-            for (int i = 0; i < size; i++) {
-                double summ = 0;
-                double quantity = 0;
-                for (int j = 0; j < 5; j++) {
-                    summ += database[i].marks[j] - '0';
-                    quantity++;
-                }
-                double avg = summ / quantity;
-                if (avg > ovr_avg) fprintf(file, "%d %s %s %s %f\n", database[i].id, database[i].name, database[i].surname, database[i].group, avg);
-            }
-        }
-        else if (strcmp(command, "print") == 0) {
-            for (int i = 0; i < size; i++) {
-                fprintf(file, "%d %s %s %s ", database[i].id, database[i].name, database[i].surname, database[i].group);
-                for (int j = 0; j < 5; j++) fprintf(file, "%c", database[i].marks[j]);
-                fprintf(file, "\n\n");
-            }
-        }
-        else if (strcmp(command, "exit") == 0) break;
-
+struct String* create_String(const char* string)
+{
+    char* copy = string;
+    int length = 0;
+    for(; *copy != '\0'; ++length && (*copy++));
+    struct String* s = (struct String*)malloc(sizeof(struct String));
+    if(s == NULL) return NULL;
+    s->length = length;
+    s->string = (char*)malloc(sizeof(char)*(length+1));
+    if(s->string == NULL)
+    {
+        free(s);
+        return NULL;
     }
-    return OK;
+    for(int i = 0; i < length; i++)
+    {
+        s->string[i] = string[i];
+    }
+    s->string[length] = '\0';
+    return s;
 }
 
-status_codes get_database(FILE * file, Student ** database, size_t * size, size_t * capacity, double * summ, double * quantity) {
-    (*size) = 0;
-    (*capacity) = 2;
-    (*database) = (Student *)malloc(sizeof(Student) * (*capacity));
-    if (!(*database)) return NO_MEMORY;
-    char new_id_string[BUFSIZ];
-    char new_name[BUFSIZ];
-    char new_surname[BUFSIZ];
-    char new_group[BUFSIZ];
-    unsigned char * new_marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-    if (!new_marks) return NO_MEMORY;
-    while (fscanf(file, "%s %s %s %s %c %c %c %c %c", new_id_string, new_name, new_surname, new_group, &new_marks[0], &new_marks[1], &new_marks[2], &new_marks[3], &new_marks[4]) != EOF) {
-        if (!strlen(new_id_string) || !strlen(new_name) || !strlen(new_surname) || !strlen(new_group)) return INVALID_PARAMETER;
-        int new_id = atoi(new_id_string);
-        if (new_id < 0 || !int_validation(new_id_string) || !name_validation(new_name) || !name_validation(new_surname)) return INVALID_PARAMETER;
-        int double_id_check = -1;
-        id_finder((*database), (*size) + 1, new_id, &double_id_check, 0);
-        if (double_id_check != -1) return INVALID_PARAMETER;
-        for (int i = 0; i < 5; i++) {
-            if (!('2' <= new_marks[i] && new_marks[i] <= '5')) return INVALID_PARAMETER;
-            (*summ) += new_marks[i] - '0';
-            (*quantity)++;
+int clear_string(struct String* s)
+{
+    if(s->string != NULL) free((void*)s->string);
+    s->string = (char*)malloc(sizeof(char)*1);
+    if(s->string == NULL) return memory_error;
+    s->string[0] = '\0';
+    s->length = 0;
+    return success;
+}
+
+int compare_strings(struct String* s1, struct String* s2)
+{//returns positive if s1 > s2
+    if(s1->length > s2->length) return bigger;
+    if(s1->length < s2->length) return lesser;
+    for(int i = 0; i < s1->length; i++)
+    {
+        if(s1->string[i] - s2->string[i] > 0) return bigger;
+        if(s1->string[i] - s2->string[i] < 0) return lesser;
+    }
+    return equal;
+}
+
+int are_equal(struct String* s1, struct String* s2)
+{
+    if(s1->length != s2->length) return 0;
+    for(int i = 0; i < s1->length; i++)
+    {
+        if(s1->string[i] != s2->string[i]) return 0;
+    }
+    return 1;
+}
+
+int copy(struct String* from, struct String** to)
+{
+    clear_string(*to);
+    *to = create_String(from->string);
+    if (*to == NULL) return memory_error;
+    return success;
+}
+
+struct String* copy_to_new(struct String* string)
+{
+    struct String* new = create_String(string->string);
+    return new;
+}
+
+int concat_strings(struct String* to, struct String* from)
+{
+    if(from->length == 0) return success;
+    if(to->length == 0)
+    {
+        to = from;
+        return success;
+    }
+    char* for_realloc = (char*)realloc(to->string, to->length + from->length);
+    if(for_realloc == NULL)
+    {
+        clear_string(to);
+        return memory_error;
+    }
+    to->string = for_realloc;
+    for(int i = 0; i < from->length + 1; i++)
+    {
+        to->string[i+to->length] = from->string[i];
+    }
+    to->length += from->length;
+    return success;
+}
+
+void delete_string(struct String* string)
+{
+    if(string->string != NULL) free(string->string);
+    string->length = 0;
+}
+
+int get_string(FILE* stream, char** string, int* length)
+{
+    *length = 0;
+    int capacity = 1;
+    char* for_realloc;
+    int c = fgetc(stream);
+    *string = (char*)malloc(sizeof(char)*1);
+    if(*string == NULL) return memory_error;
+    while(c != '\n' && c != '\0' && c != '\t' && c != ' ' && c != EOF)
+    {
+        (*string)[(*length)++] = c;
+        if(*length >= capacity)
+        {
+            capacity *= 2;
+            for_realloc = realloc(*string, capacity * sizeof(char));
+            if(for_realloc == NULL)
+            {
+                free(*string);
+                return memory_error;
+            }
+            *string = for_realloc;
         }
-        Student new;
-        new.id = new_id;
-        strcpy(new.name, new_name);
-        strcpy(new.surname, new_surname);
-        strcpy(new.group, new_group);
-        new.marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-        memcpy(new.marks, new_marks, 5);
-        free(new_marks);
-        new_marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-        (*database)[(*size)] = new;
+        c = fgetc(stream);
+    }
+    (*string)[*length] = '\0';
+    if(c == ' ') return space_reached;
+    if (c == EOF) return eof_reached;
+    if (c == '\n') return newline_reached;
+    if (c == '\0') return endl_reached;
+    return success;
+}
+
+int is_number(const char* string)
+{
+    size_t string_length = strlen(string);
+    for(int i = 0; i < string_length; i++){
+        if(!isdigit(string[i])) return 0;
+    }
+    return 1;
+}
+
+int is_correct_word(char* string)
+{
+    size_t string_length = strlen(string);
+    for(int i = 0; i < string_length; i++)
+    {
+        if(!isalpha(string[i])) return 0;
+    }
+    return 1;
+}
+
+
+int read_from_file(FILE* source, struct Student** students, size_t* size)
+{
+    struct Student read;
+    unsigned char* line[5];
+    int length;
+
+    *students = (struct Student*)malloc(sizeof(struct Student)*1);
+    int capacity = 1;
+    *size = 0;
+
+    while(!feof(source))
+    {
+        for(int i = 0; i < 5; i++)
+        {
+            int flag = get_string(source, &line[i], &length);
+            switch(flag)
+            {
+                case eof_reached:
+                case newline_reached:
+                {
+                    if(i != 4)
+                    {
+                        for(int j = 0; j < i; j++) free(line[j]);
+                        return invalid_file_content;
+                    }
+                    break;
+                }
+                case space_reached:
+                {
+                    if(i == 4)
+                    {
+                        for(int j = 0; j < i; j++) free(line[j]);
+                        return invalid_file_content;
+                    }
+                    break;
+                }
+                case memory_error:
+                {
+                    for(int j = 0; j < i; j++) free(line[j]);
+                    return memory_error;
+                }
+            }
+        }
+        if(!is_number(line[0]) || !is_correct_word(line[1]) || !is_correct_word(line[2]) || strlen(line[4]) != 5 || !is_number(line[4]))
+        {
+            for(int i = 0; i < 5; i++) free(line[i]);
+            return invalid_file_content;
+        }
         (*size)++;
-        if ((*capacity) - 1 == (*size)) {
-            (*capacity) *= 2;
-            Student * tmp = (Student *)realloc((*database), sizeof(Student) * (*capacity));
-            if (!tmp) {
-                free(*database);
-                return NO_MEMORY;
+        if(*size == capacity)
+        {
+            capacity *= 2;
+            struct Student* for_realloc = (struct Student*)realloc(*students, sizeof(struct Student)*capacity);
+            if(for_realloc == NULL)
+            {
+                free(*students);
+                return memory_error;
             }
-            (*database) = tmp;
+            *students = for_realloc;
         }
+        read.id = atoi(line[0]);
+        read.first_name = *create_String(line[1]);
+        read.last_name = *create_String(line[2]);
+        read.group = *create_String(line[3]);
+        read.marks = line[4];
+        (*students)[(*size)-1] = read;
     }
-    if (new_marks) free(new_marks);
-    return OK;
+    free(line[0]);
+    free(line[1]);
+    free(line[2]);
+    free(line[3]);
+
+    return success;
 }
 
-void id_finder(Student * database, size_t size, int to_find, int * result, int sort_flag) {
-    if (sort_flag) {
-        int left = 0, right = size - 1;
-        while (left < right) {
-            int median = (left + right) / 2;
-            if (database[median].id > to_find) left = median + 1;
-            else if (database[median].id < to_find) right = median;
-            else {
-                (*result) = median;
-                break;
-            }
-        }
-
-    }
-    else {
-        for (int i = 0; i < size; i++) {
-            if (database[i].id == to_find) {
-                (*result) = i;
-                break;
-            }
-        }
-    }
-
+int compare_id(const void* number1, const void* number2)
+{
+    if((*(struct Student*)number1).id > (*(struct Student*)number2).id) return 1;
+    if((*(struct Student*)number1).id < (*(struct Student*)number2).id) return -1;
+    return 0;
 }
 
-status_codes other_finder(Student * database, size_t size, char * to_find, int ** result, size_t * result_size, int find_flag) {
-    (*result_size) = 0;
-    size_t capacity = 2;
-    (*result) = (int *)malloc(sizeof(int) * capacity);
-    if (!result) return NO_MEMORY;
-    for (int i = 0; i < size; i++) {
-        if (strcmp((find_flag == 0) ? database[i].surname : (find_flag == 1) ? database[i].name : database[i].group, to_find) == 0) {
-            (*result)[(*result_size)] = i;
-            (*result_size)++;
-            if ((*result_size) == capacity - 1) {
-                capacity *= 2;
-                int * tmp = NULL;
-                if (!(tmp = (int *)realloc((*result), sizeof(int) * capacity))) {
-                    free(*result);
-                    return NO_MEMORY;
+int compare_group(const void* str1, const void* str2)
+{
+    char* string1 = (*(struct Student*)str1).group.string;
+    char* string2 = (*(struct Student*)str2).group.string;
+    size_t min = ((*(struct Student*)str1).group.length < (*(struct Student*)str2).group.length) ? (*(struct Student*)str1).group.length : (*(struct Student*)str2).group.length;
+    for(int i = 0; i < min; i++)
+    {
+        if(string1[i] > string2[i]) return 1;
+        if(string1[i] < string2[i]) return -1;
+    }
+    if((*(struct Student*)str1).group.length == (*(struct Student*)str2).group.length) return 0;
+    return ((*(struct Student*)str1).group.length > (*(struct Student*)str2).group.length) ? 1 : -1;
+}
+
+int compare_firstname(const void* str1, const void* str2)
+{
+    char* string1 = (*(struct Student*)str1).first_name.string;
+    char* string2 = (*(struct Student*)str2).first_name.string;
+    size_t min = ((*(struct Student*)str1).first_name.length < (*(struct Student*)str2).first_name.length) ? (*(struct Student*)str1).first_name.length : (*(struct Student*)str2).first_name.length;
+    for(int i = 0; i < min; i++)
+    {
+        if(string1[i] > string2[i]) return 1;
+        if(string1[i] < string2[i]) return -1;
+    }
+    if((*(struct Student*)str1).first_name.length == (*(struct Student*)str2).first_name.length) return 0;
+    return ((*(struct Student*)str1).first_name.length > (*(struct Student*)str2).first_name.length) ? 1 : -1;
+}
+
+
+int compare_lastname(const void* str1, const void* str2)
+{
+    char* string1 = (*(struct Student*)str1).last_name.string;
+    char* string2 = (*(struct Student*)str2).last_name.string;
+    size_t min = ((*(struct Student*)str1).last_name.length < (*(struct Student*)str2).last_name.length) ? (*(struct Student*)str1).last_name.length : (*(struct Student*)str2).last_name.length;
+    for(int i = 0; i < min; i++)
+    {
+        if(string1[i] > string2[i]) return 1;
+        if(string1[i] < string2[i]) return -1;
+    }
+    if((*(struct Student*)str1).last_name.length == (*(struct Student*)str2).last_name.length) return 0;
+    return ((*(struct Student*)str1).last_name.length > (*(struct Student*)str2).last_name.length) ? 1 : -1;
+}
+
+int write_to_file(const struct Student* student, FILE* dest)
+{
+    return fprintf(dest, "%d %s %s %s %s\n", student->id, student->first_name.string, student->last_name.string, student->group.string, student->marks);
+}
+
+int sort_students(struct Student** students, size_t amount, const char* field)
+{
+    if(!strcmp(field, "id"))
+    {
+        qsort(*students, amount, sizeof(struct Student), compare_id);
+        return success;
+    }
+    if(!strcmp(field, "lastname"))
+    {
+        qsort(*students, amount, sizeof(struct Student), compare_lastname);
+        return success;
+    }
+    if(!strcmp(field, "firstname"))
+    {
+        qsort(*students, amount, sizeof(struct Student), compare_firstname);
+        return success;
+    }
+    if(!strcmp(field, "group"))
+    {
+        qsort(*students, amount, sizeof(struct Student), compare_group);
+        return success;
+    }
+    return input_invalid;
+}
+
+int search_for_student(struct Student** students, int students_amount, const char* field, const char* tofind, int* amount, struct Student** results)
+{
+    if(!strcmp(field, "id"))
+    {
+        return find_id(students, students_amount, tofind, results, amount);
+    }
+    if(!strcmp(field, "lastname"))
+    {
+        return find_lastname(students, students_amount, tofind, results, amount);
+    }
+    if(!strcmp(field, "firstname"))
+    {
+        return find_firstname(students, students_amount, tofind, results, amount);
+    }
+    if(!strcmp(field, "group"))
+    {
+        return find_group(students, students_amount, tofind, results, amount);
+    }
+    return input_invalid;
+}
+
+int find_id(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount)
+{
+    *results = (struct Student*)malloc(sizeof(struct Student) * 1);
+    if(*results == NULL) return memory_error;
+    *amount = 0;
+    int capacity = 1;
+    int id = atoi(tofind);
+    for(int i = 0; i < students_amount; i++)
+    {
+        if((*students)[i].id == id)
+        {
+            (*amount)++;
+            if(*amount == capacity)
+            {
+                capacity <<= 1;
+                struct Student* for_realloc = (struct Student*)realloc(*results, sizeof(struct Student) * capacity);
+                if (for_realloc == NULL)
+                {
+                    free(*students);
+                    return memory_error;
                 }
-                (*result) = tmp;
+                *results = for_realloc;
+            }
+            (*results)[*amount - 1] = (*students)[i];
+        }
+    }
+    return success;
+}
+
+int find_lastname(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount)
+{
+    *results = (struct Student*)malloc(sizeof(struct Student) * 1);
+    if(*results == NULL) return memory_error;
+    *amount = 0;
+    int capacity = 1;
+    for(int i = 0; i < students_amount; i++)
+    {
+        if(!strcmp((*students)[i].last_name.string, tofind))
+        {
+            (*amount)++;
+            if(*amount == capacity)
+            {
+                capacity <<= 1;
+                struct Student* for_realloc = (struct Student*)realloc(*results, sizeof(struct Student) * capacity);
+                if (for_realloc == NULL)
+                {
+                    free(*students);
+                    return memory_error;
+                }
+                *results = for_realloc;
+            }
+            (*results)[*amount - 1] = (*students)[i];
+        }
+    }
+    return success;
+}
+
+int find_firstname(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount)
+{
+    *results = (struct Student*)malloc(sizeof(struct Student) * 1);
+    if(*results == NULL) return memory_error;
+    *amount = 0;
+    int capacity = 1;
+    for(int i = 0; i < students_amount; i++)
+    {
+        if(!strcmp((*students)[i].first_name.string, tofind))
+        {
+            (*amount)++;
+            if(*amount == capacity)
+            {
+                capacity <<= 1;
+                struct Student* for_realloc = (struct Student*)realloc(*results, sizeof(struct Student) * capacity);
+                if (for_realloc == NULL)
+                {
+                    free(*students);
+                    return memory_error;
+                }
+                *results = for_realloc;
+            }
+            (*results)[*amount - 1] = (*students)[i];
+        }
+    }
+    return success;
+}
+
+int find_group(struct Student** students, int students_amount, const char* tofind, struct Student** results, int* amount)
+{
+    *results = (struct Student*)malloc(sizeof(struct Student) * 1);
+    if(*results == NULL) return memory_error;
+    *amount = 0;
+    int capacity = 1;
+    for(int i = 0; i < students_amount; i++)
+    {
+        if(!strcmp((*students)[i].group.string, tofind))
+        {
+            (*amount)++;
+            if(*amount == capacity)
+            {
+                capacity <<= 1;
+                struct Student* for_realloc = (struct Student*)realloc(*results, sizeof(struct Student) * capacity);
+                if (for_realloc == NULL)
+                {
+                    free(*students);
+                    return memory_error;
+                }
+                *results = for_realloc;
+            }
+            (*results)[*amount - 1] = (*students)[i];
+        }
+    }
+    return success;
+}
+
+double get_avg_one(struct Student* student)
+{
+    return (double)(student->marks[0] - '0' + student->marks[1] - '0' + student->marks[2] - '0' + student->marks[3] - '0' + student->marks[4] - '0') / 5;
+}
+
+double get_avg_all(struct Student** students, int amount)
+{
+    double avg = 0;
+    for(int i = 0; i < amount; i++)
+    {
+        avg += (*students)[i].marks[0] - '0' + (*students)[i].marks[1] - '0' + (*students)[i].marks[2] - '0' + (*students)[i].marks[3] - '0' + (*students)[i].marks[4] - '0';
+    }
+    avg = avg/(amount * 5);
+    return avg;
+}
+
+int get_cmd_code(const char* command)
+{
+    if(!strcmp(command, "print")) return print;
+    if(!strcmp(command, "trace")) return trace;
+    if(!strcmp(command, "sort")) return sort;
+    if(!strcmp(command, "find")) return find;
+    if(!strcmp(command, "higraders")) return higraders;
+    if(!strcmp(command, "quit")) return quit;
+    return unknown;
+}
+
+int dialogue(const char* input_path, int argc, const char** argv)
+{
+    printf("Primitive dialogue interface v0.0\n");
+    FILE* in = fopen(input_path, "r");
+    if(in == NULL) { printf("no\n"); return success; }
+    printf("loaded file: %s\n", input_path);
+
+    struct Student* students;
+    size_t size;
+    int exit_code = read_from_file(in, &students, &size);
+    fclose(in);
+    switch(exit_code)
+    {
+        case memory_error:
+        {
+            printf("Memory error occurred while reading from file. Exiting.\n");
+            return memory_error;
+        }
+        case invalid_file_content:
+        {
+            printf("invalid file content. Exiting.\n");
+            return invalid_file_content;
+        }
+        case success:
+        {
+            printf("File contents loaded into memory.\n");
+            break;
+        }
+        default:
+        {
+            printf("Unexpected error. Exiting.\n");
+            return unexpected;
+        }
+    }
+    FILE* out = stdout;
+    FILE* file = out;
+    for(int i = 0; i < size; i++) write_to_file(&students[i], out);
+
+    printf("choose action:\n"
+           "sort id/firstname/lastname/group - sort by following field [and trace to file]\n"
+           "[trace] find id/firstname/lastname/group <value> - search among students for given field values\n"
+           "[trace] higraders - find students with average grade higher than average for whole file\n"
+           "quit - self-explanatory, isn't it?\n");
+
+    fflush(stdout);
+
+    char* line[4];
+    int len;
+    int exit;
+    int i = 0;
+    int cmd_code;
+    line[0] = strdup("");
+    while(strcmp(line[0], "quit"))
+    {
+        if(cmd_code == trace) cmd_code = get_cmd_code(line[1]);
+        else
+        {
+            i = 0;
+            fflush(stdout);
+            for(; i < 4; i++)
+            {
+                exit = get_string(stdin, &line[i], &len);
+                if(exit == newline_reached) { i++; break; }
+            }
+            i--;
+            cmd_code = get_cmd_code(line[0]);
+            if(strcmp(line[0], "trace")) out = stdout;
+        }
+        if(exit != newline_reached)
+        {
+            printf("too many arguments\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fflush(stdout);
+            switch(cmd_code)
+            {
+                case trace:
+                {
+                    if (strcmp(line[1], "higraders") && strcmp(line[1], "find"))
+                    {
+                        printf("Invalid arguments with using 'trace'.\n");
+                        continue;
+                    }
+                    if(argc < 3)
+                    {
+                        printf("Trace file path was not given.\n");
+                        continue;
+                    }
+                    if(file == stdout || file == NULL)
+                    {
+                        out = fopen(argv[2], "w");
+                        file = out;
+                        if(out == NULL)
+                        {
+                            printf("Couldn't create trace file at %s", argv[2]);
+                            out = stdout;
+                            continue;
+                        }
+                    }
+                    if(file != out) out = file;
+                    continue;
+                }
+                case print:
+                {
+                    if(i != 0) printf("Invalid input.\n");
+                    else for(int s = 0; s < size; s++) write_to_file(&students[s], out);
+                    break;
+                }
+                case sort:
+                {
+                    if(i < 1)
+                    {
+                        printf("No sorting field was given.\n");
+                        continue;
+                    }
+                    sort_students(&students, size, line[i]);
+                    printf("Students sorted by %s\n", line[i]);
+                    for(int j = 0; j < size; j++) write_to_file(&students[j], out);
+                    continue;
+                }
+                case find:
+                {
+                    int amount;
+                    struct Student* found;
+                    int flag = search_for_student(&students, size, line[i-1], line[i], &amount, &found);
+                    if(flag == memory_error)
+                    {
+                        printf("Memory error while searching for students.\n");
+                        return memory_error;
+                    }
+                    if(flag == input_invalid)
+                    {
+                        printf("Invalid input\n");
+                        continue;
+                    }
+                    for(int s = 0; s < amount; s++)
+                    {
+                        write_to_file(&found[s], out);
+                    }
+                    printf("found %d students corresponding the query '%s' = '%s'\n", amount, line[i-1], line[i]);
+                    free(found);
+                    continue;
+                }
+                case higraders:
+                {
+                    double avg_avg = get_avg_all(&students, size);
+                    for(int s = 0; s < size; s++)
+                    {
+                        double x =get_avg_one(&students[s]);
+                        if(x > avg_avg)
+                        {
+                            write_to_file(&students[s], out);
+                        }
+                    }
+                    printf("searching done.\n");
+                    continue;
+                }
+                case quit:
+                {
+                    printf("\nGoodbye!\n");
+                    break;
+                }
+                case unknown:
+                {
+                    printf("Dude wtf\n");
+                    break;
+                }
             }
         }
     }
-    return OK;
-}
-
-
-int id_comp(const void * first, const void * second) {
-    return ((Student *)first)->id - ((Student *)second)->id;
-}
-
-int surname_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->surname, ((Student *)second)->surname);
-}
-
-int name_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->name, ((Student *)second)->name);
-}
-
-int group_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->group, ((Student *)second)->group);
-}
-
-void print_menu() {
-    printf("You may use this commands:\n\n");
-    printf("find <flag> <value>\n");
-    printf("This command finds a student with <value> in <flag> and prints it in file\nYou have this <flag>s:\n");
-    printf("id - to find a student with <value> id\nname - to find a students with <value> name\nsurname - to find a students with <value> surname\ngroup - to find a students from <value> group\n\n");
-    printf("If no such student have been found, command will be ignored\n");
-    printf("sort <flag>\n");
-    printf("This commands sorts database of students by <flag>\n You have this <flag>s\n");
-    printf("id - to sort by id\nname - to sort by name\nsurname - to sort by surname\ngroup - to sort by group\n\n");
-    printf("get_stat <id>\n");
-    printf("Prints name, surname, group and average of exam marks of student which has <id>\n\n");
-    printf("find_best\n");
-    printf("Prints students that have average exam marks below that overall average exam marks\n\n");
-    printf("print\n");
-    printf("Prints current database condition\n\n");
-    printf("exit\n");
-    printf("Exits the programm\n\n");
-    printf("Wrong commands will be ignored\n");
+    for(int j = 0; j <= i; j++) free(line[j]);
+    for(i = 0; i < size; i++)
+    {
+        free(students[i].marks);
+        delete_string(&students[i].first_name);
+        delete_string(&students[i].last_name);
+        delete_string(&students[i].group);
+    }
+    free(students);
+    if(out != stdout && out != NULL) fclose(out);
+    fclose(in);
+    return success;
 }

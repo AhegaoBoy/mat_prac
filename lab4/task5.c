@@ -538,7 +538,6 @@ int main(int argc, char * argv[])
                 }
                 print_error(err_output, err, count_line);
                 ++count_line;
-                free(err_filename);
                 continue;
             }
 
@@ -596,7 +595,7 @@ int main(int argc, char * argv[])
                 continue;
             }
 
-            printf("№%d '%s' | '%s' | =%lld\n", count_line, infix, postfix, result);
+            printf("№%d '%s' | '%s' | = %lld\n", count_line, infix, postfix, result);
             count_line++;
 
             free(postfix);
@@ -618,3 +617,11 @@ int main(int argc, char * argv[])
     free(infix);
     return 0;
 }
+/*
+(1+2)*7^2
+(2+2))
+m + m
+2/0
+5-5*3
+5^(~2)
+~2*10*/

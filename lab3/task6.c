@@ -1,331 +1,483 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-
-typedef struct {
-    int id;
-    char name[BUFSIZ];
-    char surname[BUFSIZ];
-    char group[BUFSIZ];
-    unsigned char * marks;
-} Student;
+#include <math.h>
 
 typedef enum {
     OK,
     NO_MEMORY,
-    INVALID_PARAMETER
+    INVALID_PARAMETER,
+    NO_FILE
 } status_codes;
 
-int name_validation(const char * name) {
-    const size_t size = strlen(name);
-    for (int i = 0; i < strlen(name); i++) {
-        if (!isalpha(name[i])) return 0;
-    }
-    return 1;
+typedef struct {
+    int x;
+    int y;
+    char transport_id[BUFSIZ];
+    char arrive[BUFSIZ];
+    char departure[BUFSIZ];
+    char stop_status[BUFSIZ];
+} Stop;
+
+typedef struct stopList {
+    Stop value;
+    struct stopList * next;
+} stopList;
+
+typedef struct pathList {
+    stopList * value;
+    struct pathList * next;
+} pathList;
+
+long long int time_compare(const char * time1, const char * time2) {
+    int day1 = (time1[0] - '0') * 10 + (time1[1] - '0');
+    int month1 = (time1[3] - '0') * 10 + (time1[4] - '0');
+    int year1 = (time1[6] - '0') * 1000 + (time1[7] - '0') * 100 + (time1[8] - '0') * 10 + (time1[9] - '0');
+    int hours1 = (time1[11] - '0') * 10 + (time1[12] - '0');
+    int minutes1 = (time1[14] - '0') * 10 + (time1[15] - '0');
+    int seconds1 = (time1[17] - '0') * 10 + (time1[18] - '0');
+
+    int day2 = (time2[0] - '0') * 10 + (time2[1] - '0');
+    int month2 = (time2[3] - '0') * 10 + (time2[4] - '0');
+    int year2 = (time2[6] - '0') * 1000 + (time2[7] - '0') * 100 + (time2[8] - '0') * 10 + (time2[9] - '0');
+    int hours2 = (time2[11] - '0') * 10 + (time2[12] - '0');
+    int minutes2 = (time2[14] - '0') * 10 + (time2[15] - '0');
+    int seconds2 = (time1[17] - '0') * 10 + (time2[18] - '0');
+
+    long long int diff = (year1 - year2) * 3.156e7 + (month1 - month2) * 2.628e6 + (day1 - day2) * 86400 +
+                         (hours1 - hours2) * 3600 + (minutes1 - minutes2) * 60 + (seconds1 - seconds2);
+    return diff;
 }
 
-int int_validation(const char * number) {
-    const size_t size = strlen(number);
-    if (!size) return 0;
-    for (size_t i = 0; i < size; i++) {
-        if (!isdigit(number[i]) || (i != 0 && number[i] == '-')) return 0;
+void free_stopList(stopList * root) {
+    if (!root) {
+        return;
     }
-    return 1;
+    free_stopList(root->next);
+    free(root);
 }
 
-int id_comp(const void * first, const void * second);
-int surname_comp(const void * first, const void * second);
-int name_comp(const void * first, const void * second);
-int group_comp(const void * first, const void * second);
-void id_finder(Student * database, size_t size, int to_find, int * result, int sort_flag);
-status_codes other_finder(Student * database, size_t size, char * to_find, int ** result, size_t * result_size, int find_flag);
-status_codes get_database(FILE * file, Student ** database, size_t * size, size_t * capacity, double * summ, double * quantity);
+void free_pathList(pathList * root) {
+    if (!root) {
+        return;
+    }
+    free_pathList(root->next);
+    free_stopList(root->value);
+    free(root);
+}
+
+void print_stopList(stopList * root) {
+    if (!root) {
+        return;
+    }
+    printf("Coords: %d %d\n", root->value.x, root->value.y);
+    printf("ID: %s\n", root->value.transport_id);
+    printf("Arrive: %s\n", root->value.arrive);
+    printf("Departure: %s\n", root->value.departure);
+    printf("Stop status: %s\n", root->value.stop_status);
+    print_stopList(root->next);
+}
+
+void print_pathList(pathList * root) {
+    if (!root) {
+        return;
+    }
+    print_stopList(root->value);
+    printf("\n________\n");
+    print_pathList(root->next);
+}
+
+status_codes create_stopList(stopList ** head, Stop _value) {
+    stopList * tmp = (stopList *)malloc(sizeof(stopList));
+    if (!tmp) return NO_MEMORY;
+    tmp->value = _value;
+    tmp->next = (*head);
+    (*head) = tmp;
+    return OK;
+}
+
+status_codes insert_stopList(stopList * head, Stop _value) {
+    while (head->next && (time_compare(head->next->value.arrive, _value.arrive) < 0)) {
+        head = head->next;
+    }
+    stopList * tmp = (stopList *)malloc(sizeof(stopList));
+    if (!tmp) return NO_MEMORY;
+    tmp->value = _value;
+    if (head->next) tmp->next = head->next;
+    else tmp->next = NULL;
+    head->next = tmp;
+    return OK;
+}
+
+status_codes copy_stopList(stopList ** dest, stopList * src, int iter) {
+    if (!src) {
+        return OK;
+    }
+    if (!iter) {
+        if (create_stopList(dest, src->value) == NO_MEMORY) {
+            return NO_MEMORY;
+        }
+    }
+    else {
+        if (insert_stopList((*dest), src->value) == NO_MEMORY) {
+            return NO_MEMORY;
+        }
+    }
+    copy_stopList(dest, src->next, iter + 1);
+    return OK;
+}
+
+status_codes create_pathList(pathList ** head, Stop _stop) {
+    pathList * tmp = (pathList *)malloc(sizeof(pathList));
+    if (!tmp) return NO_MEMORY;
+    switch (create_stopList(&tmp->value, _stop)) {
+        case OK: break;
+        case NO_MEMORY: return NO_MEMORY;
+    }
+    tmp->next = (*head);
+    (*head) = tmp;
+    return OK;
+}
+
+
+status_codes insert_pathList(pathList * head, Stop _stop) {
+    while (head) {
+        if (strcmp(head->value->value.transport_id, _stop.transport_id) == 0) {
+            if (time_compare(head->value->value.arrive, _stop.arrive) > 0) {
+                return create_stopList(&(head->value), _stop);
+            }
+            return insert_stopList(head->value, _stop);
+        }
+        head = head->next;
+    }
+    pathList * tmp = (pathList *)malloc(sizeof(pathList));
+    if (!tmp) {
+        return NO_MEMORY;
+    }
+    if (create_stopList(&(tmp->value), _stop) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    tmp->next = NULL;
+    head->next = tmp;
+    return OK;
+
+}
+
+status_codes get_info(pathList ** head, int array_size, char * array[]) {
+    for (int i = 1; i < array_size; i++) {
+        FILE * file = fopen(array[i], "r");
+        if (!file) return NO_FILE;
+        Stop _stop;
+        fscanf(file, "%d%d", &_stop.x, &_stop.y);
+        char new_id[BUFSIZ], new_arrive_date[BUFSIZ], new_arrive_time[BUFSIZ], new_departure_date[BUFSIZ], new_departure_time[BUFSIZ], stop_status[BUFSIZ];
+        while (fscanf(file, "%s%s%s%s%s%s", new_id, new_arrive_date, new_arrive_time, new_departure_date, new_departure_time, stop_status) != EOF) {
+            strcpy(_stop.transport_id, new_id);
+            char * new_arrive = strcat(new_arrive_date, " ");
+            new_arrive = strcat(new_arrive, new_arrive_time);
+            char * new_departure = strcat(new_departure_date, " ");
+            new_departure = strcat(new_departure, new_departure_time);
+            strcpy(_stop.arrive, new_arrive);
+            strcpy(_stop.departure, new_departure);
+            strcpy(_stop.stop_status, stop_status);
+            if (!(*head)) {
+                switch (create_pathList(head, _stop)) {
+                    case OK: break;
+                    case NO_MEMORY:
+                        fclose(file);
+                        free_pathList(*head);
+                        return NO_MEMORY;
+                }
+            }
+            else {
+                switch (insert_pathList((*head), _stop)) {
+                    case OK:
+                        break;
+                    case NO_MEMORY:
+                        fclose(file);
+                        free_pathList(*head);
+                        return NO_MEMORY;
+                }
+
+            }
+        }
+        fclose(file);
+    }
+    return OK;
+}
+
+status_codes find_longest_way(pathList * path, char * max_result, char * min_result, double max, double min, const double eps) {
+    if (eps <= 0) {
+        return INVALID_PARAMETER;
+    }
+    if (!path) {
+        return OK;
+    }
+    double summ = 0;
+    stopList * copy = NULL;
+    if (copy_stopList(&copy, path->value, 0) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    while (copy->next) {
+        double current = sqrt((copy->value.x - copy->next->value.x) * (copy->value.x - copy->next->value.x) +
+                              (copy->value.y - copy->next->value.y) * (copy->value.y - copy->next->value.y));
+        summ += current;
+        stopList * tmp = copy->next;
+        free(copy);
+        copy = tmp;
+    }
+    if (summ - max > eps) {
+        max = summ;
+        strcpy(max_result, copy->value.transport_id);
+    }
+    if (summ - min < eps || min + 1 < eps) {
+        min = summ;
+        strcpy(min_result, copy->value.transport_id);
+    }
+    free_stopList(copy);
+    find_longest_way(path->next, max_result, min_result, max, min, eps);
+    return OK;
+}
+
+status_codes find_most_routes(pathList * path, char * most_result, char * min_result, int max, int min) {
+    if (!path)
+        return OK;
+    int current = 0;
+    stopList * copy = NULL;
+    if (copy_stopList(&copy, path->value, 0) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    while (copy->next) {
+        if (strcmp(copy->value.stop_status, "start") == 0) {
+            current++;
+        }
+        stopList * tmp = copy->next;
+        free(copy);
+        copy = tmp;
+    }
+    if (strcmp(copy->value.stop_status, "start") == 0) {
+        current++;
+    }
+    if (current >= max) {
+        max = current;
+        strcpy(most_result, copy->value.transport_id);
+    }
+    if (current < min || min == -1) {
+        min = current;
+        strcpy(min_result, copy->value.transport_id);
+    }
+    free_stopList(copy);
+    find_most_routes(path->next, most_result, min_result, max, min);
+    return OK;
+}
+
+status_codes find_most_route_length(pathList * path, char * max_result, char * min_result, double max, double min, const double eps) {
+    if (eps <= 0) {
+        return INVALID_PARAMETER;
+    }
+    if (!path) {
+        return OK;
+    }
+    double summ = 0;
+    double current = 0;
+    stopList * copy = NULL;
+    if (copy_stopList(&copy, path->value, 0) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    while (copy->next) {
+        if (strcmp(copy->value.stop_status, "end") == 0) {
+            current = 0;
+            if (summ - max > eps) {
+                max = summ;
+                strcpy(max_result, copy->value.transport_id);
+            }
+            if (current < min || min == -1) {
+                min = summ;
+                strcpy(min_result, copy->value.transport_id);
+            }
+            summ = 0;
+        }
+        else {
+            current = sqrt((copy->value.x - copy->next->value.x) * (copy->value.x - copy->next->value.x) +
+                           (copy->value.y - copy->next->value.y) * (copy->value.y - copy->next->value.y));
+            summ += current;
+        }
+        stopList * tmp = copy->next;
+        free(copy);
+        copy = tmp;
+    }
+    free_stopList(copy);
+    find_most_route_length(path->next, max_result, min_result, max, min, eps);
+    return OK;
+}
+
+status_codes find_most_sleeptime(pathList * path, char * max_result, char * min_result, int max, int min) {
+    if (!path) {
+        return OK;
+    }
+    stopList * copy = NULL;
+    if (copy_stopList(&copy, path->value, 0) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    while (copy->next) {
+        int diff = time_compare(copy->value.departure, copy->value.arrive);
+        if (diff > max) {
+            max = diff;
+            strcpy(max_result, copy->value.transport_id);
+        }
+        if (diff < min || min == -1) {
+            min = diff;
+            strcpy(min_result, copy->value.transport_id);
+        }
+        stopList * tmp = copy->next;
+        free(copy);
+        copy = tmp;
+    }
+    int diff = time_compare(copy->value.departure, copy->value.arrive);
+    if (diff > max) {
+        max = diff;
+        strcpy(max_result, copy->value.transport_id);
+    }
+    if (diff < min || min == -1) {
+        min = diff;
+        strcpy(min_result, copy->value.transport_id);
+    }
+    free_stopList(copy);
+    find_most_sleeptime(path->next, max_result, min_result, max, min);
+    return OK;
+}
+
+status_codes find_longest_ovr_sleeptime(pathList * path, char * max_result, char * min_result, int min, int max) {
+    if (!path) {
+        return OK;
+    }
+    stopList * copy = NULL;
+    if (copy_stopList(&copy, path->value, 0) == NO_MEMORY) {
+        return NO_MEMORY;
+    }
+    int summ = 0;
+    while (copy->next) {
+        int diff = time_compare(copy->value.departure, copy->value.arrive);
+        summ += diff;
+        stopList * tmp = copy->next;
+        free(copy);
+        copy = tmp;
+    }
+    int diff = time_compare(copy->value.departure, copy->value.arrive);
+    summ += diff;
+    if (summ > max) {
+        max = summ;
+        strcpy(max_result, copy->value.transport_id);
+    }
+    if (summ < min || min == -1) {
+        min = summ;
+        strcpy(min_result, copy->value.transport_id);
+    }
+    free_stopList(copy);
+    find_longest_ovr_sleeptime(path->next, max_result, min_result, min, max);
+    return OK;
+}
 
 void print_menu();
 
-status_codes communicate(FILE * file, Student * database, size_t size, double ovr_avg);
-
-int main(int argc, char * argv[]) {
-    if (argc != 3) {
-        printf("Wrong flag\n");
-        return -1;
-    }
-    FILE * in = fopen(argv[1], "r");
-    if (!in) {
-        printf("No file\n");
-        return -1;
-    }
-    FILE * out = fopen(argv[2], "w");
-    if (!out) {
-        printf("No file\n");
-        fclose(in);
-        return -1;
-    }
-    Student * database = NULL;
-    size_t size, capacity;
-    double ovr_summ = 0;
-    double ovr_quantity = 0;
-    switch (get_database(in, &database, &size, &capacity, &ovr_summ, &ovr_quantity)) {
-        case OK:
-            break;
-        case NO_MEMORY:
-            fclose(in);
-            fclose(out);
-            printf("No memory\n");
-            return -1;
-        case INVALID_PARAMETER:
-            fclose(in);
-            fclose(out);
-            free(database);
-            printf("Invalid parameter detected\n");
-            return -1;
-
-    }
-    double ovr_avg = ovr_summ / ovr_quantity;
-    if (communicate(out, database, size, ovr_avg) == NO_MEMORY) {
-        free(database);
-        fclose(in);
-        printf("No memory\n");
-        return -1;
-    }
-    free(database);
-    fclose(in);
-    fclose(out);
-    return 0;
-}
-
-status_codes communicate(FILE * file, Student * database, size_t size, double ovr_avg) {
+status_codes communicate(pathList * path) {
     print_menu();
-    int sort_flag = 0;
+    const double eps = 1e-10;
     while (1) {
         char command[BUFSIZ];
         scanf("%s", command);
-        if (strcmp(command, "find") == 0) {
-            char flag[BUFSIZ];
-            scanf("%s", flag);
-            if (strcmp(flag, "id") == 0) {
-                int to_find;
-                int result_id = -1;
-                scanf("%d", &to_find);
-                id_finder(database, size, to_find, &result_id, sort_flag);
-                if (result_id != -1) {
-                    fprintf(file, "%d %s %s %s ", database[result_id].id, database[result_id].name, database[result_id].surname, database[result_id].group);
-                    for (int i = 0; i < 5; i++) fprintf(file, "%c", database[result_id].marks[i]);
-                    fprintf(file, "\n");
-                }
-                fprintf(file, "\n");
-            }
-            else if (strcmp(flag, "surname") == 0 || strcmp(flag, "name") == 0 || strcmp(flag, "group") == 0) {
-                char to_find[BUFSIZ];
-                scanf("%s", to_find);
-                int * result = NULL;
-                size_t result_size = 0;
-                if (other_finder(database, size, to_find, &result, &result_size, (strcmp(flag, "surname") == 0) ? 0 : (strcmp(flag, "name") == 0) ? 1 : 2) == NO_MEMORY) {
-                    fclose(file);
-                    return NO_MEMORY;
-                }
-                for (int i = 0; i < result_size; i++) {
-                    fprintf(file, "%d %s %s %s ", database[result[i]].id, database[result[i]].name, database[result[i]].surname, database[result[i]].group);
-                    for (int j = 0; j < 5; j++) fprintf(file, "%c", database[result[i]].marks[j]);
-                    fprintf(file, "\n");
-                }
-                fprintf(file, "\n");
-                free(result);
-                result = NULL;
-            }
-
+        if (strcmp(command, "info") == 0) {
+            print_pathList(path);
         }
-        else if (strcmp(command, "sort") == 0) {
-            char flag[BUFSIZ];
-            scanf("%s", flag);
-            if (strcmp(flag, "id") == 0) {
-                qsort(database, size, sizeof(database[0]), id_comp);
-                sort_flag = 1;
-            }
-            else {
-                if (strcmp(flag, "surname") == 0) {
-                    qsort(database, size, sizeof(database[0]), surname_comp);
-                }
-                else if (strcmp(flag, "name") == 0) {
-                    qsort(database, size, sizeof(database[0]), name_comp);
-                }
-                else if (strcmp(flag, "grop") == 0) {
-                    qsort(database, size, sizeof(database[0]), group_comp);
-                }
-                sort_flag = 0;
-            }
-        }
-        else if (strcmp(command, "get_stat") == 0) {
-            int to_find;
-            int result_id = -1;
-            scanf("%d", &to_find);
-            id_finder(database, size, to_find, &result_id, sort_flag);
-            if (result_id != -1) {
-                fprintf(file, "%d %s %s %s ", database[result_id].id, database[result_id].name, database[result_id].surname, database[result_id].group);
-                double summ = 0;
-                double quantity = 0;
-                for (int i = 0; i < 5; i++) {
-                    summ += database[result_id].marks[i] - '0';
-                    quantity++;
-                }
-                fprintf(file, "%f\n\n", summ / quantity);
-            }
-        }
-        else if (strcmp(command, "find_best") == 0) {
-            for (int i = 0; i < size; i++) {
-                double summ = 0;
-                double quantity = 0;
-                for (int j = 0; j < 5; j++) {
-                    summ += database[i].marks[j] - '0';
-                    quantity++;
-                }
-                double avg = summ / quantity;
-                if (avg > ovr_avg) fprintf(file, "%d %s %s %s %f\n", database[i].id, database[i].name, database[i].surname, database[i].group, avg);
-            }
-        }
-        else if (strcmp(command, "print") == 0) {
-            for (int i = 0; i < size; i++) {
-                fprintf(file, "%d %s %s %s ", database[i].id, database[i].name, database[i].surname, database[i].group);
-                for (int j = 0; j < 5; j++) fprintf(file, "%c", database[i].marks[j]);
-                fprintf(file, "\n\n");
-            }
-        }
-        else if (strcmp(command, "exit") == 0) break;
-
-    }
-    return OK;
-}
-
-status_codes get_database(FILE * file, Student ** database, size_t * size, size_t * capacity, double * summ, double * quantity) {
-    (*size) = 0;
-    (*capacity) = 2;
-    (*database) = (Student *)malloc(sizeof(Student) * (*capacity));
-    if (!(*database)) return NO_MEMORY;
-    char new_id_string[BUFSIZ];
-    char new_name[BUFSIZ];
-    char new_surname[BUFSIZ];
-    char new_group[BUFSIZ];
-    unsigned char * new_marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-    if (!new_marks) return NO_MEMORY;
-    while (fscanf(file, "%s %s %s %s %c %c %c %c %c", new_id_string, new_name, new_surname, new_group, &new_marks[0], &new_marks[1], &new_marks[2], &new_marks[3], &new_marks[4]) != EOF) {
-        if (!strlen(new_id_string) || !strlen(new_name) || !strlen(new_surname) || !strlen(new_group)) return INVALID_PARAMETER;
-        int new_id = atoi(new_id_string);
-        if (new_id < 0 || !int_validation(new_id_string) || !name_validation(new_name) || !name_validation(new_surname)) return INVALID_PARAMETER;
-        int double_id_check = -1;
-        id_finder((*database), (*size) + 1, new_id, &double_id_check, 0);
-        if (double_id_check != -1) return INVALID_PARAMETER;
-        for (int i = 0; i < 5; i++) {
-            if (!('2' <= new_marks[i] && new_marks[i] <= '5')) return INVALID_PARAMETER;
-            (*summ) += new_marks[i] - '0';
-            (*quantity)++;
-        }
-        Student new;
-        new.id = new_id;
-        strcpy(new.name, new_name);
-        strcpy(new.surname, new_surname);
-        strcpy(new.group, new_group);
-        new.marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-        memcpy(new.marks, new_marks, 5);
-        free(new_marks);
-        new_marks = (unsigned char *)malloc(sizeof(unsigned char) * 5);
-        (*database)[(*size)] = new;
-        (*size)++;
-        if ((*capacity) - 1 == (*size)) {
-            (*capacity) *= 2;
-            Student * tmp = (Student *)realloc((*database), sizeof(Student) * (*capacity));
-            if (!tmp) {
-                free(*database);
+        else if (strcmp(command, "routes") == 0) {
+            char max[128];
+            char min[128];
+            if (find_most_routes(path, max, min, -1, -1) == NO_MEMORY) {
                 return NO_MEMORY;
             }
-            (*database) = tmp;
+            printf("Most routes: %s\nMin routes %s\n", max, min);
         }
-    }
-    if (new_marks) free(new_marks);
-    return OK;
-}
-
-void id_finder(Student * database, size_t size, int to_find, int * result, int sort_flag) {
-    if (sort_flag) {
-        int left = 0, right = size - 1;
-        while (left < right) {
-            int median = (left + right) / 2;
-            if (database[median].id > to_find) left = median + 1;
-            else if (database[median].id < to_find) right = median;
-            else {
-                (*result) = median;
-                break;
+        else if (strcmp(command, "ovr_length") == 0) {
+            char max[128];
+            char min[128];
+            if (find_longest_way(path, max, min, -1.0, -1.0, eps) == NO_MEMORY) {
+                return NO_MEMORY;
             }
+            printf("Longest way: %s\nShortest way: %s\n", max, min);
         }
-
-    }
-    else {
-        for (int i = 0; i < size; i++) {
-            if (database[i].id == to_find) {
-                (*result) = i;
-                break;
+        else if (strcmp(command, "route_length") == 0) {
+            char max[128];
+            char min[128];
+            if (find_most_route_length(path, max, min, -1.0, -1.0, eps) == NO_MEMORY) {
+                return NO_MEMORY;
             }
+            printf("Longest way in one route: %s\nShortest way in one route: %s\n", max, min);
         }
-    }
-
-}
-
-status_codes other_finder(Student * database, size_t size, char * to_find, int ** result, size_t * result_size, int find_flag) {
-    (*result_size) = 0;
-    size_t capacity = 2;
-    (*result) = (int *)malloc(sizeof(int) * capacity);
-    if (!result) return NO_MEMORY;
-    for (int i = 0; i < size; i++) {
-        if (strcmp((find_flag == 0) ? database[i].surname : (find_flag == 1) ? database[i].name : database[i].group, to_find) == 0) {
-            (*result)[(*result_size)] = i;
-            (*result_size)++;
-            if ((*result_size) == capacity - 1) {
-                capacity *= 2;
-                int * tmp = NULL;
-                if (!(tmp = (int *)realloc((*result), sizeof(int) * capacity))) {
-                    free(*result);
-                    return NO_MEMORY;
-                }
-                (*result) = tmp;
+        else if (strcmp(command, "sleeptime") == 0) {
+            char max[128];
+            char min[128];
+            if (find_most_sleeptime(path, max, min, -1, -1) == NO_MEMORY) {
+                return NO_MEMORY;
             }
+            printf("Most sleeptime in one stop: %s\nLeast sleeptime in one stop: %s\n", max, min);
+        }
+        else if (strcmp(command, "ovr_sleeptime") == 0) {
+            char max[128];
+            char min[128];
+            if (find_longest_ovr_sleeptime(path, max, min, -1, -1) == NO_MEMORY) {
+                return NO_MEMORY;
+            }
+            printf("Most overall sleeptime: %s\nLeast overall sleeprime: %s\n", max, min);
+        }
+        else if (strcmp(command, "print_menu") == 0) {
+            print_menu();
+        }
+        else if (strcmp(command, "exit") == 0) {
+            return OK;
+        }
+        else {
+            printf("No such command\n");
         }
     }
-    return OK;
 }
 
+int main(int argc, char * argv[]) {
+    if (argc < 2) {
+        printf("Wrong flag\n");
+        return -1;
+    }
+    pathList * paths = NULL;
+    switch (get_info(&paths, argc, argv)) {
+        case OK:
+            break;
+        case NO_MEMORY:
+            free_pathList(paths);
+            printf("No memory\n");
+            return -1;
+        case INVALID_PARAMETER:
+            printf("Invalid parameter\n");
+            return -1;
+        case NO_FILE:
+            printf("No such file\n");
+            return -1;
 
-int id_comp(const void * first, const void * second) {
-    return ((Student *)first)->id - ((Student *)second)->id;
-}
-
-int surname_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->surname, ((Student *)second)->surname);
-}
-
-int name_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->name, ((Student *)second)->name);
-}
-
-int group_comp(const void * first, const void * second) {
-    return strcmp(((Student *)first)->group, ((Student *)second)->group);
+    }
+    if (communicate(paths) == NO_MEMORY) {
+        free_pathList(paths);
+        printf("No memory\n");
+        return -1;
+    }
+    free_pathList(paths);
+    return 0;
 }
 
 void print_menu() {
-    printf("You may use this commands:\n\n");
-    printf("find <flag> <value>\n");
-    printf("This command finds a student with <value> in <flag> and prints it in file\nYou have this <flag>s:\n");
-    printf("id - to find a student with <value> id\nname - to find a students with <value> name\nsurname - to find a students with <value> surname\ngroup - to find a students from <value> group\n\n");
-    printf("If no such student have been found, command will be ignored\n");
-    printf("sort <flag>\n");
-    printf("This commands sorts database of students by <flag>\n You have this <flag>s\n");
-    printf("id - to sort by id\nname - to sort by name\nsurname - to sort by surname\ngroup - to sort by group\n\n");
-    printf("get_stat <id>\n");
-    printf("Prints name, surname, group and average of exam marks of student which has <id>\n\n");
-    printf("find_best\n");
-    printf("Prints students that have average exam marks below that overall average exam marks\n\n");
-    printf("print\n");
-    printf("Prints current database condition\n\n");
-    printf("exit\n");
-    printf("Exits the programm\n\n");
-    printf("Wrong commands will be ignored\n");
+    printf("You have this commands:\n");
+    printf("info - to print info about all the stops of transportIDs\n");
+    printf("routes - find transport_IDs that made the most/least routes\n");
+    printf("ovr_length - find most/least length that transportID made for the all time\n");
+    printf("route_length - find most/least length that transportID made in one route\n");
+    printf("sleeptime - find most/least time that transportID slept on one stop\n");
+    printf("ovr_sleeptime - find most/least time that transportID slept on all stops\n");
+    printf("print_menu - print this menu again\n");
+    printf("exit - to leave the programm\n");
 }

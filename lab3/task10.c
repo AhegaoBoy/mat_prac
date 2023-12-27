@@ -11,8 +11,8 @@ typedef enum enum_errors
     FINE
 }status_code;
 
-status_code read_string_from_file(FILE* input, char** string);
-status_code do_work(FILE* input, FILE* output);
+status_code read_strings_from_file(FILE* input, char*** strings, int* quantity);
+void do_work(char** strings,int quantity, FILE* output);
 void print_node(FILE* output, char c, int depth);
 
 int main(int argc, char* argv[])
@@ -31,6 +31,16 @@ int main(int argc, char* argv[])
         return FILE_OPEN_ERROR;
     }
 
+    char** strings = NULL;
+    int quantity = 0;
+    status_code check = read_strings_from_file(input, &strings,  &quantity);
+    fclose(input);
+
+    if(check != FINE)
+    {
+        printf("MEMORY ALLOCATION ERROR\n");
+        return MEMORY_ALLOCATION_ERROR;
+    }
     FILE* output = NULL;
     output = fopen(argv[2], "w");
     if(output == NULL)
@@ -40,56 +50,59 @@ int main(int argc, char* argv[])
         return FILE_OPEN_ERROR;
     }
 
-    status_code check = do_work(input, output);
-    if(check != FINE)
-    {
-        printf("MEMORY ALLOCATION ERROR\n");
-        return MEMORY_ALLOCATION_ERROR;
-    }
-
-    fclose(input);
+    do_work(strings,quantity, output);
     fclose(output);
     return 0;
 }
 
-status_code read_string_from_file(FILE* input, char** string)
+status_code read_strings_from_file(FILE* input, char*** strings, int* quantity)
 {
-    char* str = (char*)malloc(sizeof(char));
-    if(str == NULL)
-        return MEMORY_ALLOCATION_ERROR;
-    int len = 0;
-    int capacity = 1;
-    char c = 1;
+    *strings = (char**)malloc(sizeof (char*));
+    if(*strings == NULL) return MEMORY_ALLOCATION_ERROR;
+    int strings_cap = 1;
     while(!feof(input))
     {
-        c = getc(input);
-        if(c == EOF)
+        char* str = (char*)malloc(sizeof(char));
+        if(str == NULL)
+            return MEMORY_ALLOCATION_ERROR;
+        int len = 0;
+        int capacity = 1;
+        char c = 1;
+        while(c != '\n' && c != EOF)
         {
-            (*string) = (char*)malloc(sizeof(char) * len);
-            strcpy(*string, str);
-            free(str);
-            return FINE;
-        }
-        if(c == '\n')
-        {
-            (*string) = (char*)malloc(sizeof(char) * len);
-            if(*string == NULL) return MEMORY_ALLOCATION_ERROR;
-            strcpy(*string, str);
-            free(str);
-            return FINE;
-        }
-        if(len == capacity)
-        {
-            char* for_realloc = realloc(str, sizeof(char) * 2 * capacity);
-            if(for_realloc == NULL)
+            c = getc(input);
+            if(c == EOF || c == '\n')
             {
+                if(strings_cap == (*quantity))
+                {
+                    char** for_realloc = (char**)realloc((*strings), sizeof(char *) * 2 * strings_cap);
+                    if(for_realloc == NULL)
+                    {
+                        for(int i = 0; i < *quantity; ++i) free((*strings)[i]);
+                        free(*strings);
+                        return MEMORY_ALLOCATION_ERROR;
+                    }
+                    strings_cap<<=1;
+                    *strings = for_realloc;
+                }
+                (*strings)[(*quantity)] = (char*)malloc(sizeof(char) * len);
+                if((*strings)[(*quantity)] == NULL) return MEMORY_ALLOCATION_ERROR;
+                strcpy((*strings)[(*quantity)++], str);
                 free(str);
-                return MEMORY_ALLOCATION_ERROR;
             }
-            str = for_realloc;
-            capacity<<=1;
+            if(len == capacity)
+            {
+                char* for_realloc = realloc(str, sizeof(char) * 2 * capacity);
+                if(for_realloc == NULL)
+                {
+                    free(str);
+                    return MEMORY_ALLOCATION_ERROR;
+                }
+                str = for_realloc;
+                capacity<<=1;
+            }
+            str[len++] = c;
         }
-        str[len++] = c;
     }
     return FINE;
 }
@@ -100,28 +113,20 @@ void print_node(FILE* output, char c, int depth)
     fprintf(output, "%c\n", c);
 }
 
-status_code do_work(FILE* input, FILE* output)
+void do_work(char** strings, int quantity, FILE* output)
 {
-    status_code check;
-    char* string;
-    int number_of_seq = 1;
-    while(!feof(input))
+    for(int i = 0; i < quantity; ++i)
     {
-        fprintf(output, "tree number: %d\n", number_of_seq);
-        check = read_string_from_file(input, &string);
+        fprintf(output, "tree number: %d\n", i + 1);
         int depth = 0;
-        if(check != FINE) return check;
-        int length = strlen(string);
-        for(int i = 0; i < length; ++i)
+        int length = strlen(strings[i]);
+        for(int j = 0; j < length; ++j)
         {
-            if(string[i] == '(') depth++;
-            else if(string[i] == ')') depth--;
-            else if(isalpha(string[i])) print_node(output, string[i], depth);
+            if(strings[i][j] == '(') depth++;
+            else if(strings[i][j] == ')') depth--;
+            else if(isalpha(strings[i][j])) print_node(output, strings[i][j], depth);
         }
-        number_of_seq++;
-        free(string);
     }
-    return FINE;
 }
 
 //A (L, M) B (S (O, P) J) C , D , E , F , G

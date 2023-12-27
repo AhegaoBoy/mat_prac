@@ -32,13 +32,13 @@ typedef struct {
     char birth[BUFSIZ];
     char gender;
     double salary;
-} Liver; // печень)
+}Liver;
 
 typedef struct Stack {
     Liver head;
     actions action;
     struct Stack * tail;
-} Stack;
+}Stack;
 
 status_codes insertStack(Stack ** root, Liver value, actions _action) {
     Stack * tmp = (Stack *)malloc(sizeof(Stack));
@@ -382,10 +382,10 @@ status_codes undo(List ** head, Stack ** root, int actions_count) {
     for (int i = 0; i < actions_count / 2; i++) {
         Liver value;
         actions action;
+        Liver to_change;
         popStack(root, &value, &action);
         switch (action) {
             case changed:
-                Liver to_change;
                 find_to_changeList((*head), value, &to_change);
                 unsigned int no_use = 0;
                 while (cmpLiver(to_change, (*head)->data) == 0) {
@@ -705,3 +705,16 @@ void print_menu() {
     printf("undo - to undo last opeartions\n");
     printf("exit - to exit\n\n");
 }
+
+/*
+Popov Sergei Evgenevich 08:10:2004 M 100000000000
+Petrova Maria Ivanovna 15:06:1990 W 89898
+Kuznetsov Alexey Sergeyevich 05:09:1988 M 1000
+Ivanova Ekaterina Dmitrievna 20:03:1995 W 6666
+Smirnov Andrei Alexeevich 12:11:2000 W 2212
+Sidorova Olga Ivanovna 08:04:1992 W 72000
+Fedorov Pavel Nikolaevich 25:07:1985 M 80000
+Volkova Anna Alexeevna 19:09:1997 W 67000
+Egorov Dmitry Igorevich 02:02:1983 M 95000
+Morozova Irina Olegovna 14:12:1989 W 78000
+Kirillova Oksana 14:12:1982 W 65123*/

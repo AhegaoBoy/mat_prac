@@ -280,14 +280,8 @@ int check_needs_rebuilt(Hash_Table * table)
     printf("min collision:%d\nmax collision:%d\n", min, max);
     double res = (double)max / min;
     printf("%lf\n", res);
-    if(res - 2 > EPSILON)
-    {
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
+    if(res - 2 > EPSILON) return 1;
+    else return 0;
 }
 
 int is_prime(int num)
@@ -491,3 +485,8 @@ int main(int agrc, char * argv[])
     fclose(temp);
     return 0;
 }
+//#define lOl 123
+//#define lol 456
+//lol lol lol lol lol lol
+//lOl lOl lOl lol
+//lOl lOl Lol lOl

@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <time.h>
-#include "string.h"
 
 #define STR_SIZE 256
 
@@ -33,6 +32,19 @@ typedef struct My_string {
     unsigned int size;
     char* data;
 } My_string;
+
+
+int my_strlen(const My_string* str);
+My_string* String(const char* str);
+void string_clear(My_string* str);
+int my_strcpy(My_string** destination, const My_string* source);
+My_string* my_strcpy_new(const My_string* source);
+int my_strcmp(My_string* left, My_string* right);
+int is_equal(My_string* left, My_string* right);
+int concat_strings(My_string** left, const My_string* right);
+void print_str(My_string* str);
+status_realloc my_realloc(void** var, int size);
+status_free free_all(int count, ...);
 
 typedef struct Adress {
     My_string* city;
@@ -95,12 +107,44 @@ status_code find_non_expired_mails(Post* post, Mail** exp_mails, int* size);
 int is_expired(const Mail* a);
 int compare_mails_date_create(const void* a, const void* b);
 void print_mails(Mail* mails, int size);
-void print_menu();
-void print_cur_post(Post*);
-void print_info_mail(Mail* mail);
 
+void print_menu() {
+    printf("|============================|Hello|============================|\n");
+    printf("| [Create] Post <Adress>                                        |\n");
+    printf("| [Change] Post <Adress>                                        |\n");
+    printf("| [Add] <Adress weight id time_create time_get>                 |\n");
+    printf("| [Remove] <Id>                                                 |\n");
+    printf("| [Table] - print mails of current post                         |\n");
+    printf("| [Sort] - to sort mails by index and id                        |\n");
+    printf("| [Print expired] - to print expired mails of this post         |\n");
+    printf("| [Print non-expired] - to print non-expired mails of this post |\n");
+    printf("| [Find] - to find mail by id                                   |\n");
+    printf("| [Exit] - to exit the programm                                 |\n");
+    printf("|===============================================================|\n");
+}
 
-        int main(int argc, char* argv[]) {
+void print_cur_post(Post* current) {
+    if (!current) {
+        return;
+    }
+    printf("Current post is located in: %s %s %d %s %d %s\n", current->cur_id->city->data,  current->cur_id->street->data,  current->cur_id->house,  current->cur_id->block->data,  current->cur_id->flat,  current->cur_id->index->data);
+}
+
+void print_info_mail(Mail* mail) {
+    printf("| Index: %s\n", mail->ad.index->data);
+    printf("| City: %s\n", mail->ad.city->data);
+    printf("| Street: %s\n", mail->ad.street->data);
+    printf("| House: %d\n", mail->ad.house);
+    printf("| Block: %s\n", mail->ad.block->data);
+    printf("| Flat: %d\n", mail->ad.flat);
+    printf("| Weight: %lf\n", mail->weight);
+    printf("| Id: %s\n", mail->id->data);
+    printf("| Time create: %s\n", mail->time_create->data);
+    printf("| Time get: %s\n", mail->time_get->data);
+    printf("\n");
+}
+
+int main(int argc, char* argv[]) {
     Post* storage_posts = NULL;
     char* arg_one = NULL;
     char* arg_two = NULL;
